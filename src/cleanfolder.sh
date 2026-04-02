@@ -6,7 +6,7 @@ show_usage() {
     echo ""
     echo "Description:"
     echo "  Recursively finds and removes all files with these extensions:"
-    echo " *.txt *.keras *.pkl log* 2025* Noisy* ML .DS_Store"
+    echo " *.txt *.keras *.pkl log* 2025* Noisy* ML .DS_Store tb_model"
     echo "  inside TARGET_DIRECTORY."
     echo ""
     echo "Arguments:"
