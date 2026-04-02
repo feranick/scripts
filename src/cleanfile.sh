@@ -16,8 +16,8 @@ show_usage() {
     echo "  -h, --help        Show this help message and exit."
     echo ""
     echo "Examples:"
-    echo "  ./clean_script.sh .DS_Store /Users/jdoe/Documents"
-    echo "  ./clean_script.sh node_modules ."
+    echo "  ./cleanfile.sh .DS_Store /Users/jdoe/Documents"
+    echo "  ./cleanfile.sh node_modules ."
 }
 
 # --- Argument Parsing ---
