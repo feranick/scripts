@@ -1,59 +1,97 @@
 #!/bin/bash
 
 # =========================================================
-# 1. Hardcoded URL
+# Default Variables
 # =========================================================
+MODE="candidate"
 BASE_URL="https://ftp.mozilla.org/pub/thunderbird/candidates/"
+PREFIX=""
+
+# =========================================================
+# Argument Parsing
+# =========================================================
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -r|--release)
+            MODE="release"
+            BASE_URL="https://ftp.mozilla.org/pub/thunderbird/releases/"
+            shift # Move past the flag
+            ;;
+        -h|--help)
+            echo "Usage: $0 [-r|--release] [PREFIX]"
+            echo "  -r, --release    Use the releases directory instead of candidates"
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [-r|--release] [PREFIX]"
+            exit 1
+            ;;
+        *)
+            # If it's not a flag, it must be the prefix
+            PREFIX="$1"
+            shift
+            ;;
+    esac
+done
 
 # Ensure the base URL always ends with a trailing slash
 BASE_URL="${BASE_URL%/}/"
 
-# The prefix is the first argument
-PREFIX="$1" 
-
 # ---------------------------------------------------------
-# Step 1: Find the latest candidate directory
+# Step 1: Find the latest version directory
 # ---------------------------------------------------------
-echo "Searching for the latest candidate directory in $BASE_URL..."
+echo "Searching for the latest directory in $BASE_URL..."
 
-LATEST_CANDIDATE=$(curl -s "$BASE_URL" | \
-  grep -oE "href=\"[^\"]*${PREFIX}[^\"]+-candidates/\"" | \
+# Adjust search pattern based on whether we are looking at candidates or releases
+if [ "$MODE" == "candidate" ]; then
+    DIR_PATTERN="href=\"[^\"]*${PREFIX}[^\"]+-candidates/\""
+else
+    # Exclude folders that start with letters (like 'latest/') to ensure we grab versions
+    DIR_PATTERN="href=\"[^\"]*${PREFIX}[0-9][^\"]+/\""
+fi
+
+LATEST_DIR=$(curl -s "$BASE_URL" | \
+  grep -oE "$DIR_PATTERN" | \
   sed -E 's/href="([^"]+)"/\1/' | \
   awk -F'/' '{print $(NF-1)"/"}' | \
   sort -V | \
   tail -n 1)
 
-if [ -z "$LATEST_CANDIDATE" ]; then
-  echo "Error: No matching candidate directories found."
+if [ -z "$LATEST_DIR" ]; then
+  echo "Error: No matching directories found."
   exit 1
 fi
 
-echo "-> Found latest candidate: $LATEST_CANDIDATE"
-CANDIDATE_URL="${BASE_URL}${LATEST_CANDIDATE}"
+echo "-> Found latest version: $LATEST_DIR"
+CURRENT_URL="${BASE_URL}${LATEST_DIR}"
 
 # ---------------------------------------------------------
-# Step 2: Find the latest build directory inside the candidate
+# Step 2: Find the latest build directory (ONLY for candidates)
 # ---------------------------------------------------------
-echo "Searching for the latest build in $CANDIDATE_URL..."
+if [ "$MODE" == "candidate" ]; then
+    echo "Searching for the latest build in $CURRENT_URL..."
 
-LATEST_BUILD=$(curl -s "$CANDIDATE_URL" | \
-  grep -oE "href=\"[^\"]*build[0-9]+/?\"" | \
-  sed -E 's/href="([^"]+)"/\1/' | \
-  awk -F'/' '{print $(NF-1)"/"}' | \
-  sort -V | \
-  tail -n 1)
+    LATEST_BUILD=$(curl -s "$CURRENT_URL" | \
+      grep -oE "href=\"[^\"]*build[0-9]+/?\"" | \
+      sed -E 's/href="([^"]+)"/\1/' | \
+      awk -F'/' '{print $(NF-1)"/"}' | \
+      sort -V | \
+      tail -n 1)
 
-if [ -z "$LATEST_BUILD" ]; then
-  echo "Error: No build directories found inside $CANDIDATE_URL"
-  exit 1
+    if [ -z "$LATEST_BUILD" ]; then
+      echo "Error: No build directories found inside $CURRENT_URL"
+      exit 1
+    fi
+
+    echo "-> Found latest build: $LATEST_BUILD"
+    CURRENT_URL="${CURRENT_URL}${LATEST_BUILD}"
 fi
-
-echo "-> Found latest build: $LATEST_BUILD"
 
 # ---------------------------------------------------------
 # Step 3: Find the .dmg file in mac/en-US/
 # ---------------------------------------------------------
-MAC_DIR_URL="${CANDIDATE_URL}${LATEST_BUILD}mac/en-US/"
+MAC_DIR_URL="${CURRENT_URL}mac/en-US/"
 
 echo "Searching for the .dmg file in $MAC_DIR_URL..."
 
@@ -68,6 +106,7 @@ if [ -z "$DMG_FILE" ]; then
   exit 1
 fi
 
+# URL-encode the filename (replace spaces with %20)
 ENCODED_DMG_FILE=$(echo "$DMG_FILE" | sed 's/ /%20/g')
 
 DOWNLOAD_URL="${MAC_DIR_URL}${ENCODED_DMG_FILE}"
@@ -80,12 +119,11 @@ echo "---------------------------------------------------------"
 # Step 4: Ask for confirmation
 # ---------------------------------------------------------
 read -p "Do you want to proceed with the download? (y/n) " -n 1 -r
-echo    # Move to a new line after user input
+echo    
 
 if [[ $REPLY =~ ^[Yy]$ ]]
 then
     echo "Starting download..."
-    # Changed from -O to -o "$DMG_FILE" to save it cleanly with the spaces locally
     curl -o "$DMG_FILE" "$DOWNLOAD_URL"
     echo "Download complete! Saved to your current directory."
 else
