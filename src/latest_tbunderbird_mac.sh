@@ -16,7 +16,6 @@ PREFIX="$1"
 # ---------------------------------------------------------
 echo "Searching for the latest candidate directory in $BASE_URL..."
 
-# Added logic to handle absolute paths from the server's hrefs
 LATEST_CANDIDATE=$(curl -s "$BASE_URL" | \
   grep -oE "href=\"[^\"]*${PREFIX}[^\"]+-candidates/\"" | \
   sed -E 's/href="([^"]+)"/\1/' | \
@@ -69,7 +68,9 @@ if [ -z "$DMG_FILE" ]; then
   exit 1
 fi
 
-DOWNLOAD_URL="${MAC_DIR_URL}${DMG_FILE}"
+ENCODED_DMG_FILE=$(echo "$DMG_FILE" | sed 's/ /%20/g')
+
+DOWNLOAD_URL="${MAC_DIR_URL}${ENCODED_DMG_FILE}"
 echo "---------------------------------------------------------"
 echo "File ready to download: $DMG_FILE"
 echo "From: $DOWNLOAD_URL"
@@ -84,7 +85,8 @@ echo    # Move to a new line after user input
 if [[ $REPLY =~ ^[Yy]$ ]]
 then
     echo "Starting download..."
-    curl -O "$DOWNLOAD_URL"
+    # Changed from -O to -o "$DMG_FILE" to save it cleanly with the spaces locally
+    curl -o "$DMG_FILE" "$DOWNLOAD_URL"
     echo "Download complete! Saved to your current directory."
 else
     echo "Download cancelled by user."
