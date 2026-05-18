@@ -49,6 +49,7 @@ if [ "$MODE" == "candidate" ]; then
 else
     # Exclude folders that start with letters (like 'latest/') to ensure we grab versions
     DIR_PATTERN="href=\"[^\"]*${PREFIX}[0-9][^\"]+/\""
+    LATEST_BUILD="release"
 fi
 
 LATEST_DIR=$(curl -s "$BASE_URL" | \
@@ -112,6 +113,8 @@ ENCODED_DMG_FILE=$(echo "$DMG_FILE" | sed 's/ /%20/g')
 DOWNLOAD_URL="${MAC_DIR_URL}${ENCODED_DMG_FILE}"
 echo "---------------------------------------------------------"
 echo "File ready to download: $DMG_FILE"
+echo "Build: ${LATEST_BUILD////}"
+echo ""
 echo "From: $DOWNLOAD_URL"
 echo "---------------------------------------------------------"
 
